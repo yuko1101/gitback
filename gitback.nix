@@ -51,7 +51,26 @@ in
                 default = null;
                 description = "Path to the git credential file";
               };
-              # TODO: add remote option
+              remotes = lib.mkOption {
+                type = lib.types.listOf (
+                  lib.types.submodule {
+                    options = {
+                      url = lib.mkOption {
+                        type = lib.types.nullOr lib.types.str;
+                        default = null;
+                        description = "URL of the remote repository";
+                      };
+                      urlFile = lib.mkOption {
+                        type = lib.types.nullOr lib.types.str;
+                        default = null;
+                        description = "Path to a file containing the URL of the remote repository";
+                      };
+                    };
+                  }
+                );
+                default = [ ];
+                description = "Git remotes to push to (or fetch from), first one is used for fetching";
+              };
             };
           };
         }
@@ -61,8 +80,8 @@ in
 
   config =
     let
-      gitCredentialHelper = pkgs.writeScript "git-credential-helper" ''
-        #!${pkgs.nushell}/bin/nu
+      gitCredentialHelper = pkgs.writeScript "git-credential-gitback" ''
+        #!${pkgs.nushell}/bin/nu --stdin
         ${builtins.readFile ./scripts/git-credential-helper.nu}
       '';
       genConfig = name: value: {
@@ -95,7 +114,7 @@ in
                   ]
                   ++ lib.optionals (value.gitConfig.credentialFile != null) [
                     "-c"
-                    "credential.helper=\"${gitCredentialHelper} ${value.gitConfig.credentialFile}\""
+                    "credential.helper=${gitCredentialHelper} ${value.gitConfig.credentialFile}"
                   ];
                 git = pkgs.writeScriptBin "git" ''
                   #!${pkgs.nushell}/bin/nu
@@ -109,7 +128,7 @@ in
                   let value = r##'${builtins.toJSON value}'## | from json
 
                   cd $value.gitPath
-                  ${git}/bin/git init
+                  ${git}/bin/git init -b main
                   # TODO: more initialization steps if needed
                 '';
                 backupScript = pkgs.writeScript "gitback-backup-${name}" ''
@@ -117,13 +136,41 @@ in
                   let name = r##'${name}'##
                   let value = r##'${builtins.toJSON value}'## | from json
 
-                  # TODO: implement the backup logic
+                  cd $value.gitPath
+
+                  let should_commit = ${git}/bin/git status -s -uall ./data/ | is-not-empty
+                  if $should_commit {
+                    print $'Committing changes for ($name)'
+                    ${git}/bin/git add ./data/
+                    ${git}/bin/git commit -m $'Backup at (date now | format date %+)'
+                  } else {
+                    print $'No changes to commit for ($name)'
+                  }
+
+                  print $'Pushing changes for ($name)'
+                  for e in ($value.gitConfig.remotes | enumerate) {
+                    let i = $e.index;
+                    let remote = $e.item;
+                    let url = $remote.url | default { 
+                      if $remote.urlFile != null { 
+                        open --raw $remote.urlFile | str trim
+                      } else {
+                        null
+                      }
+                    }
+                    if $url == null {
+                      print $'No URL provided for remote ($i), skipping...'
+                      continue
+                    }
+                    ${git}/bin/git push $url main
+                  }
                 '';
                 mainScript = pkgs.writeScript "gitback-main-${name}" ''
                   #!${pkgs.nushell}/bin/nu
                   let name = r##'${name}'##
                   let value = r##'${builtins.toJSON value}'## | from json
 
+                  cd $value.gitPath
                   let should_init = try {
                     ${git}/bin/git rev-parse --is-inside-work-tree o+e> /dev/null
                     false
@@ -133,10 +180,12 @@ in
                   if $should_init {
                     print $'Initializing git repository for ($name)'
                     ${initScript}
+                    print $'Initialization completed for ($name)'
                   }
 
                   print $'Backing up ($name)'
                   ${backupScript}
+                  print $'Backup completed for ($name)'
                 '';
               in
               mainScript;
