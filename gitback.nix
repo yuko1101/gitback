@@ -10,7 +10,6 @@ let
 in
 {
   options.services.gitback = {
-    enable = lib.mkEnableOption "GitBack service";
     backups = lib.mkOption {
       description = "Configuration for backups";
       type = lib.types.attrsOf (
@@ -223,7 +222,7 @@ in
         };
       generated = lib.concatMapAttrs genConfig cfg.backups;
     in
-    lib.mkIf cfg.enable {
+    {
       inherit (generated) systemd fileSystems; # to avoid infinite recursion with config
     };
 }
