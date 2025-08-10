@@ -101,6 +101,8 @@ in
         systemd.services."gitback-${name}" = {
           description = "GitBack Backup Service for ${name}";
           wantedBy = [ "multi-user.target" ];
+          wants = lib.optional (value.gitConfig.remotes != [ ]) "network-online.target";
+          after = lib.optional (value.gitConfig.remotes != [ ]) "network-online.target";
           serviceConfig = {
             Type = "oneshot";
             ExecStart =
@@ -128,8 +130,8 @@ in
                   let value = r##'${builtins.toJSON value}'## | from json
 
                   cd $value.gitPath
-                  ${git}/bin/git init -b main
-                  # TODO: more initialization steps if needed
+                  ${git}/bin/git init -b main # TODO: consider getting branch name from config or generating it to avoid conflicts
+                  # TODO: more initialization steps if needed (e.g. encrypting the git repository with git-crypt)
                 '';
                 backupScript = pkgs.writeScript "gitback-backup-${name}" ''
                   #!${pkgs.nushell}/bin/nu
