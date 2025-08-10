@@ -149,17 +149,17 @@ in
 
                     cd $value.gitPath
 
-                    let should_commit = ${git}/bin/git status -s -uall r##'${mountPoint}'## | is-not-empty
+                    let should_commit = ${git}/bin/git add -N r##'${mountPoint}'## --dry-run | is-not-empty
                     if $should_commit {
                       print $'Committing changes for ($name)'
+                      ${git}/bin/git add -N r##'${mountPoint}'##
                       if $value.checkEncryption {
                         let is_not_encrypted = ${pkgs.git-crypt}/bin/git-crypt status | lines | any { str trim | str starts-with $'not encrypted: (r##'${mountPoint}'## | path relative-to $value.gitPath)/' }
                         if $is_not_encrypted {
                           error make { msg: $'Data in the git repository is not fully encrypted, but checkEncryption is enabled for ($name). Please setup git-crypt properly to protect your data.' }
                         }
                       }
-                      ${git}/bin/git add r##'${mountPoint}'##
-                      ${git}/bin/git commit -m $'Backup at (date now | format date %+)'
+                      ${git}/bin/git commit -am $'Backup at (date now | format date %+)'
                     } else {
                       print $'No changes to commit for ($name)'
                     }
