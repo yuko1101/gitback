@@ -66,7 +66,7 @@ in
                       urlFile = lib.mkOption {
                         type = lib.types.nullOr lib.types.str;
                         default = null;
-                        description = "Path to a file containing the URL of the remote repository";
+                        description = "Path to a file containing the URL of the remote repository (you can specify the line number if the file contains multiple URLs, e.g. /path/to/file:2)";
                       };
                     };
                   }
@@ -165,11 +165,14 @@ in
 
                     print $'Pushing changes for ($name)'
                     for e in ($value.gitConfig.remotes | enumerate) {
-                      let i = $e.index;
-                      let remote = $e.item;
+                      let i = $e.index
+                      let remote = $e.item
                       let url = $remote.url | default { 
-                        if $remote.urlFile != null { 
-                          open --raw $remote.urlFile | str trim
+                        if $remote.urlFile != null {
+                          let parts = $remote.urlFile | split row ':' -n 2
+                          let file = $parts | first
+                          let line = $parts | get 1? | default { '1' } | into int
+                          open --raw $file | lines | get ($line - 1) | str trim
                         } else {
                           null
                         }
