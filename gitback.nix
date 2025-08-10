@@ -37,6 +37,10 @@ in
               type = lib.types.str;
               description = "Group under which the backup service runs";
             };
+            checkEncryption = lib.mkOption {
+              type = lib.types.bool;
+              description = "Check if the git repository is encrypted (e.g. with git-crypt) before performing backups";
+            };
             gitConfig = {
               userName = lib.mkOption {
                 type = lib.types.str;
@@ -148,6 +152,12 @@ in
                     let should_commit = ${git}/bin/git status -s -uall r##'${mountPoint}'## | is-not-empty
                     if $should_commit {
                       print $'Committing changes for ($name)'
+                      if $value.checkEncryption {
+                        let is_not_encrypted = ${pkgs.git-crypt}/bin/git-crypt status | lines | any { str trim | str starts-with $'not encrypted: (r##'${mountPoint}'## | path relative-to $value.gitPath)/' }
+                        if $is_not_encrypted {
+                          error make { msg: $'Data in the git repository is not fully encrypted, but checkEncryption is enabled for ($name). Please setup git-crypt properly to protect your data.' }
+                        }
+                      }
                       ${git}/bin/git add r##'${mountPoint}'##
                       ${git}/bin/git commit -m $'Backup at (date now | format date %+)'
                     } else {
