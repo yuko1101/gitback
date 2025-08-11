@@ -158,7 +158,7 @@ in
                           error make { msg: $'Data in the git repository is not fully encrypted, but checkEncryption is enabled for ($name). Please setup git-crypt properly to protect your data.' }
                         }
                       }
-                      ${git}/bin/git commit -am $'Backup at (date now | format date %+)'
+                      PATH=($env.PATH | prepend ${pkgs.git-crypt}/bin) ${git}/bin/git commit -am $'Backup at (date now | format date %+)'
                     } else {
                       print $'No changes to commit for ($name)'
                     }
