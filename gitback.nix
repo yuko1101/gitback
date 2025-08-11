@@ -148,7 +148,7 @@ in
 
                     cd $value.gitPath
 
-                    let should_commit = ${git}/bin/git add -N r##'${mountPoint}'## --dry-run | is-not-empty
+                    let should_commit = ${git}/bin/git add r##'${mountPoint}'## --dry-run | is-not-empty
                     if $should_commit {
                       print $'Committing changes for ($name)'
                       ${git}/bin/git add -N r##'${mountPoint}'##
