@@ -147,6 +147,7 @@ in
                     let value = r##'${builtins.toJSON value}'## | from json
 
                     cd $value.gitPath
+                    $env.PATH = $env.PATH | prepend ${pkgs.git-crypt}/bin
 
                     let should_commit = ${git}/bin/git status -s -uall r##'${mountPoint}'## | is-not-empty
                     if $should_commit {
@@ -158,9 +159,7 @@ in
                           error make { msg: $'Data in the git repository is not fully encrypted, but checkEncryption is enabled for ($name). Please setup git-crypt properly to protect your data.' }
                         }
                       }
-                      with-env { PATH: ($env.PATH | prepend ${pkgs.git-crypt}/bin) } {
-                        ${git}/bin/git commit -am $'Backup at (date now | format date %+)'
-                      }
+                      ${git}/bin/git commit -am $'Backup at (date now | format date %+)'
                     } else {
                       print $'No changes to commit for ($name)'
                     }
